@@ -1,3 +1,16 @@
+''''
+Shared steps for both HDFS and BGL.
+
+Input table columns:
+        LineId, Timestamp, Level, Component, Content, Label, Subtype, SessionId
+        - Label: 0 = normal, 1 = anomaly
+        - Subtype: anomaly category, or "" if none
+        - SessionId: block ID (HDFS) or time window (BGL)
+
+Call add_templates() then group_into_sessions() so both datasets
+end up in the same format.
+'''''
+
 import pandas as pd
 
 
