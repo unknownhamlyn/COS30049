@@ -1,17 +1,18 @@
-''''
-Shared steps for both HDFS and BGL.
-
-Input table columns:
-        LineId, Timestamp, Level, Component, Content, Label, Subtype, SessionId
-        - Label: 0 = normal, 1 = anomaly
-        - Subtype: anomaly category, or "" if none
-        - SessionId: block ID (HDFS) or time window (BGL)
-
-Call add_templates() then group_into_sessions() so both datasets
-end up in the same format.
-'''''
+# Shared steps used by both HDFS and BGL
+# Each dataset script makes a table with these columns first:
+# LineId, Timestamp, Level, Component, Content, Label, Subtype, SessionId
+# then calls add_templates() and group_into_sessions() below
 
 import pandas as pd
+
+# shared severity scale so severity means the same thing in both datasets
+# BGL has 6 levels and HDFS mostly INFO/WARN, so we group them like syslog does (RFC 5424)
+# 0 = info, 1 = warning, 2 = error or worse
+SEVERITY_SCORE = {
+        "INFO": 0,
+        "WARN": 1, "WARNING": 1,
+        "ERROR": 2, "SEVERE": 2, "FATAL": 2, "FAILURE": 2,
+}
 
 
 def add_templates(df, id_prefix):
@@ -50,11 +51,15 @@ def group_into_sessions(logs, dataset_name):
         # keep the lines in the same order as the original log
         logs = logs.sort_values("LineId")
 
+        # convert each level to the 0/1/2 scale (unknown levels count as info)
+        logs["SeverityScore"] = logs["Level"].map(SEVERITY_SCORE).fillna(0).astype(int)
+
         session_table = logs.groupby("SessionId").agg(
                 start_ts=("Timestamp", "min"),
                 end_ts=("Timestamp", "max"),
                 events=("EventId", list),
                 levels=("Level", list),
+                severities=("SeverityScore", list),
                 components=("Component", list),
                 line_ids=("LineId", list),
                 label=("Label", "max"),
