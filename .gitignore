@@ -1,3 +1,7 @@
 data
 HDFS_v1.zip
 generated
+__pycache__
+pyproject.toml
+uv.lock
+.python-version
