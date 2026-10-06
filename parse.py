@@ -8,18 +8,6 @@ from itertools import permutations
 
 import numpy as np
 
-'''
- Preprocessing
-1. Convert to individual lines from source format (ie. zipped)
-2. Remove malformed lines (ie. non-printable characters)
-3. Split messages on whitespace
-
- Message Type Generation Pipeline
-1. Group messages into paritions based on length
-2. Run LCS between the first two lines
-3. The LCS is that partitions message type
-'''
-
 def LCS(inx, iny, debug=False):
     # returns a mask of matching values
 
