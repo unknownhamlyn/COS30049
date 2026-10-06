@@ -4,10 +4,9 @@ import sys
 import argparse
 
 from collections import defaultdict
-from enum import Enum
-import numpy as np
+from itertools import permutations
 
-from time import sleep
+import numpy as np
 
 '''
  Preprocessing
@@ -21,15 +20,8 @@ from time import sleep
 3. The LCS is that partitions message type
 '''
 
-def LCS(inx: list, iny: list):
+def LCS(inx, iny, debug=False):
     # returns a mask of matching values
-
-    CellType = Enum('CellType', [
-        ('none', 0),
-        ('match', 1),
-        ('up', 2),
-        ('left', 3),
-    ])
 
     # makes a grid to store info
     #   i n x
@@ -37,52 +29,65 @@ def LCS(inx: list, iny: list):
     # n _ _ _
     # y _ _ _
 
-    # defaultdict with tuple vector indices and a default value to make later code cleaner
-    grid: dict[tuple[int, int], tuple[int, CellType]] = defaultdict(lambda: (0, CellType.left))
+    grid = defaultdict(lambda: (-1, 0))
 
-    corner = [0, 0]
+    corner = [-1, -1]
     for y, y_val in enumerate(iny):
         for x, x_val in enumerate(inx):
             if (x_val == y_val and
-                corner[0] <= x and
-                corner[1] <= y
+                corner[0] < x and
+                corner[1] < y
             ):
-                grid[x, y] = grid[x-1, y-1][0] + 1, CellType.match
-                corner = [x + 1, y + 1]
+                grid[x, y] = (-1, -1)
+                corner = [x, y]
             else:
-                if grid[x-1, y][0] > grid[x, y-1][0]:
-                    grid[x, y] = grid[x-1, y][0], CellType.left
-                else:
-                    grid[x, y] = grid[x, y-1][0], CellType.up
+                if grid[x, y-1][1] == -1:
+                    grid[x, y] = (0, -1)
 
     # print the grid (types)
-    #CellTypeIcons = [' ', '\\', '^', '<']
-    #print('  ' + ''.join(inx))
-    #for y, y_val in enumerate(iny):
-    #    print(y_val + ' ' + ''.join([CellTypeIcons[grid[x, y][1].value] for x in range(len(inx))]))
+    if debug:
+        icons = {
+            (-1, 0): '<',
+            (0, -1): '^',
+            (-1, -1): '\\'
+        }
+        xLabelWidth = max([len(str(i)) for i in inx])+1
+        yLabelWidth = max([len(str(i)) for i in iny])
+        print(' '*yLabelWidth + ''.join([str(i).rjust(xLabelWidth, ' ') for i in inx]))
+        for y, y_val in enumerate(iny):
+            print(str(y_val).rjust(yLabelWidth, ' ') + ''.join([icons[grid[x, y]].rjust(xLabelWidth, ' ') for x in range(len(inx))]))
 
     # backtrack from bottom right
     x_matches = []
     y_matches = []
-    pos = (len(inx)-1, len(iny)-1)
-    while pos[0] >= 0 and pos[1] >= 0:
-        print(pos)
-        sleep(0.5)
-        match grid[pos][1].value:
-            case CellType.left.value:
-                pos = (pos[0]-1, pos[1])
-                x_matches.append(False)
-            case CellType.up.value:
-                pos = (pos[0], pos[1]-1)
-                y_matches.append(False)
-            case CellType.match.value:
-                pos = (pos[0]-1, pos[1]-1)
-                x_matches.append(True)
-                y_matches.append(True)
-    x_matches.reverse()
-    y_matches.reverse()
+    corner = [len(inx)-1, len(iny)-1]
+    while -1 not in corner:
+        match grid[tuple(corner)]:
+            case (-1, 0):
+                corner[0] -= 1
+                x_matches.insert(0, False)
+            case (0, -1):
+                corner[1] -= 1
+                y_matches.insert(0, False)
+            case (-1, -1):
+                corner = [i - 1 for i in corner]
+                x_matches.insert(0, True)
+                y_matches.insert(0, True)
+
+    x_matches = [False]*(1+corner[0]) + x_matches
+    y_matches = [False]*(1+corner[1]) + y_matches
 
     return (x_matches, y_matches)
+
+# O(n^2)
+def Template(lines):
+    assert len(set([len(line) for line in lines])) == 1, 'lines of differing length'
+
+    mask = np.full(len(lines[0]), True)
+    for a, b in permutations(lines, 2):
+        mask = np.logical_and(mask, LCS(a, b)[0])
+    
+    return [mask[k] and v or '*' for k, v in enumerate(lines[0])]
 
 class Parser:
     bins: dict[int, list[list[str]]] = {}
@@ -105,3 +110,9 @@ if __name__ == '__main__':
 
     print()
     print(parser.bins)
+
+lines = list(map(lambda x: x.split(), [
+    "cpu_freq 34231 3431 cool thumbsup",
+    "cpu_freq 23141 592 cool thumbdown",
+    "cpu_freq w952 23553 cool haiii"
+]))
