@@ -17,6 +17,7 @@ Loghub's Zenodo record and place each .log file as shown below.
 ## Setup (venv + pip)
 python -m venv venv
 source venv/bin/activate # Windows: venv\Scripts\activate
+
 pip install pandas numpy scikit-learn matplotlib seaborn jupyter joblib xgboost
 
 On macOS, xgboost also needs the OpenMP runtime:
