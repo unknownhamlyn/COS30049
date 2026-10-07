@@ -26,11 +26,17 @@ brew install libomp
 ## How to run
 
 Run from the `scripts` folder, in this order (each step uses the previous one's output):
+
 python hdfs_preprocess.py # clean + parse HDFS, build sessions
+
 python bgl_preprocess.py # clean + parse BGL, build sessions
+
 python feature_extraction.py # turn sessions into feature tables
+
 python train_models.py --features ../HDFS_v1/processed/hdfs_features.csv
+
 --sessions ../HDFS_v1/processed/hdfs_sessions.jsonl --out results_hdfs
+
 python make_figures.py # figures for the Data Analysis section
 
 Results (tables, model, error analysis, figures) are written under `results_hdfs/`
