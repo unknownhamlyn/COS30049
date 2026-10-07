@@ -20,8 +20,12 @@ def add_templates(df, id_prefix):
         # with <*> so the same type of message gets the same template
         # e.g. "8 floating point alignment exceptions" -> "<*> floating point alignment exceptions"
 
+        # HDFS block IDs, e.g. blk_38865049064139660 or blk_-6952295868487656571
+        # masked first, otherwise a negative ID is only half masked ("blk_-<*>") and the
+        # same message type gets a different template for positive and negative IDs
+        masked = df["Content"].str.replace(r"blk_-?\d+", "<*>", regex=True)
         # file paths, e.g. /bgl/apps/test.rts or ./mmcs_db_server
-        masked = df["Content"].str.replace(r"\S*/\S*/\S*|(?<!\S)\.?/\S*", "<*>", regex=True)
+        masked = masked.str.replace(r"\S*/\S*/\S*|(?<!\S)\.?/\S*", "<*>", regex=True)
         # long hex values with no digits, e.g. ffffffff
         masked = masked.str.replace(r"\b[0-9a-fA-F]{8,}\b", "<*>", regex=True)
         # any word with a digit in it (same idea as the Drain parser, He et al. 2017)
