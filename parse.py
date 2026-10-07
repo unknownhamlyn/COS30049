@@ -4,18 +4,14 @@ import sys
 import argparse
 
 from collections import defaultdict
-from itertools import permutations
+from dataclasses import dataclass
 
 import numpy as np
+import pandas as pd
+import sklearn
 
 def LCS(inx, iny, debug=False):
     # returns a mask of matching values
-
-    # makes a grid to store info
-    #   i n x
-    # i _ _ _
-    # n _ _ _
-    # y _ _ _
 
     grid = defaultdict(lambda: (-1, 0))
 
@@ -46,61 +42,84 @@ def LCS(inx, iny, debug=False):
             print(str(y_val).rjust(yLabelWidth, ' ') + ''.join([icons[grid[x, y]].rjust(xLabelWidth, ' ') for x in range(len(inx))]))
 
     # backtrack from bottom right
-    x_matches = []
-    y_matches = []
-    corner = [len(inx)-1, len(iny)-1]
-    while -1 not in corner:
-        match grid[tuple(corner)]:
-            case (-1, 0):
-                corner[0] -= 1
-                x_matches.insert(0, False)
-            case (0, -1):
-                corner[1] -= 1
-                y_matches.insert(0, False)
-            case (-1, -1):
-                corner = [i - 1 for i in corner]
-                x_matches.insert(0, True)
-                y_matches.insert(0, True)
-
-    x_matches = [False]*(1+corner[0]) + x_matches
-    y_matches = [False]*(1+corner[1]) + y_matches
+    x_matches, y_matches = np.full(len(inx), False), np.full(len(iny), False)
+    pos = [len(inx)-1, len(iny)-1]
+    while -1 not in pos:
+        move = grid[tuple(pos)]
+        if move ==(-1, -1):
+            x_matches[pos[0]] = True
+            y_matches[pos[1]] = True
+        pos = np.add(pos, move)
 
     return (x_matches, y_matches)
 
-# O(n^2)
-def Template(lines):
-    assert len(set([len(line) for line in lines])) == 1, 'lines of differing length'
+def MatchesTemplate(line, template):
+    if type(template == str):
+        template = template.split()
+    return all([l == t or t == '<*>' for l, t in zip(line, template)])
 
-    mask = np.full(len(lines[0]), True)
-    for a, b in permutations(lines, 2):
-        mask = np.logical_and(mask, LCS(a, b)[0])
-    
-    return [mask[k] and v or '*' for k, v in enumerate(lines[0])]
+def Distance(a, b):
+    return list(LCS(a, b)[0]).count(True) / max(len(a), len(b))
 
-class Parser:
-    bins: dict[int, list[list[str]]] = {}
-    
-    def parse(self, msg: list[str]):
-        print(msg)
-        if len(msg) not in self.bins:
-            self.bins[len(msg)] = [msg]
-        else:
-            print("".join(set(self.bins[len(msg)][0]) & set(msg)))
+def ExtractTemplatesDbscan(lines):
+    if type(lines) == list:
+        lines = np.array(list, dtype=object)
+
+    # compute metric matrix
+    count = len(lines)
+    metric = np.zeros((count, count))
+
+    # consider sparse metric matrix?
+    # 200  -  3.7s
+    # 500  -  7.9s
+    # 1000 - 24.5s
+    for pos in [(x, y) for y in range(1, count) for x in range(0, y)]:
+        metric[pos] = Distance(*lines[list(pos)])
+
+    db = sklearn.cluster.DBSCAN(
+        metric="precomputed",
+        eps=0.15,
+        min_samples=10
+    ).fit_predict(metric)
+
+    raise Exception('not implimented')
+    #return pd.DataFrame({'lines': lines, 'type': db})
+
+def LinesToTemplate(a, b):
+    return ' '.join([unique and field or '<*>' for field, unique in zip(a, LCS(a, b)[0])])
+
+def ExtractTemplateBins(lines):
+    print(len(lines))
+    # bin(template, length, records)
+    @dataclass
+    class Bin:
+        length: int
+        template: str | None
+        records: list[list[str]]
+
+    bins: list[Bin] = []
+
+    for line in lines:
+        length = len(line)
+        sorted_line = False
+        for bin in bins:
+            if bin.template and MatchesTemplate(line, bin.template):
+                bin.records.append(line)
+                sorted_line = True
+                break
+            elif bin.template is None and bin.length == length and bin.records:
+                bin.template = LinesToTemplate(line, bin.records[0])
+                bin.records.append(line)
+                sorted_line = True
+                break
+        if not sorted_line:
+            bins.append(Bin(length, None, [line])) 
+    return bins
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
     argparser.add_argument("file", type=argparse.FileType("r")) # ty: ignore[deprecated]
     args = argparser.parse_args()
 
-    parser = Parser()
-    for line in args.file:
-        parser.parse(line.split())
-
-    print()
-    print(parser.bins)
-
-lines = list(map(lambda x: x.split(), [
-    "cpu_freq 34231 3431 cool thumbsup",
-    "cpu_freq 23141 592 cool thumbdown",
-    "cpu_freq w952 23553 cool haiii"
-]))
+with open('data/HDFS.log') as f:
+    lines = np.array([next(f).split() for _ in range(20000)], dtype=object)
